@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Review Scan{% endblock %}
+{% block content %}
+<section class="panel review-panel">
+    <div>
+        <p class="eyebrow">Scan Result</p>
+        <h1>{% if pending.warnings %}Verify Carefully{% else %}Scan Successful{% endif %}</h1>
+        {% if pending.confidence %}
+            <p class="muted">OCR confidence: {{ pending.confidence }}</p>
+        {% endif %}
+    </div>
+
+    {% if pending.warnings %}
+        <div class="warning-box">
+            <strong>We couldn't confidently identify every detail.</strong>
+            <ul>
+                {% for warning in pending.warnings %}
+                    <li>{{ warning }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
+    {% if pending.source_line %}
+        <div class="source-line">
+            <span>Detected row</span>
+            <p>{{ pending.source_line }}</p>
+        </div>
+    {% endif %}
+
+    <form method="post" class="review-form">
+        {% csrf_token %}
+        <label><span>Name</span>{{ form.name }}</label>
+        <label><span>Date</span>{{ form.date }}</label>
+        <div class="time-grid">
+            <label><span>Time In</span>{{ form.time_in_1 }}</label>
+            <label><span>Time Out</span>{{ form.time_out_1 }}</label>
+            <label><span>Time In</span>{{ form.time_in_2 }}</label>
+            <label><span>Time Out</span>{{ form.time_out_2 }}</label>
+        </div>
+        {% if form.non_field_errors %}
+            <div class="message error">{{ form.non_field_errors }}</div>
+        {% endif %}
+        <div class="total-card">
+            <span>Total</span>
+            <strong>{{ total_display }}</strong>
+        </div>
+        <div class="split-actions">
+            <a class="button ghost" href="{% url 'scanner:scan' person.student_id %}">Scan Again</a>
+            <button class="button primary" type="submit">Confirm</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

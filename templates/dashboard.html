@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<section class="dashboard-header">
+    <div>
+        <p class="eyebrow">Welcome back</p>
+        <h1>{{ person.name }}</h1>
+        <p class="muted">ID: {{ person.student_id }}</p>
+    </div>
+    <a class="button ghost" href="{% url 'scanner:switch_person' %}" onclick="localStorage.removeItem('person_id')">Switch Person</a>
+</section>
+
+<section class="progress-panel">
+    <div class="progress-copy">
+        <p class="eyebrow">OJT Progress</p>
+        <h2>{{ completed }} / {{ target }}</h2>
+        <p>Remaining: {{ remaining }}</p>
+    </div>
+    <div class="progress-meter" aria-label="OJT progress">
+        <span style="width: {{ progress }}%"></span>
+    </div>
+    <p class="progress-percent">{{ progress }}%</p>
+</section>
+
+<section class="action-row">
+    <a class="button primary scan-button" href="{% url 'scanner:scan' person.student_id %}">Scan Logbook</a>
+</section>
+
+<section class="history-section">
+    <h2>Attendance History</h2>
+    {% if history %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Time</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in history %}
+                    <tr>
+                        <td>{{ row.date|date:"M d, Y" }}</td>
+                        <td>{{ row.time }}</td>
+                        <td>{{ row.total }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="empty-state">No attendance records saved yet.</p>
+    {% endif %}
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+localStorage.setItem("person_id", "{{ person.student_id|escapejs }}");
+</script>
+{% endblock %}

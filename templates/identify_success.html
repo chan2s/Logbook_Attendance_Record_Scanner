@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Person Ready{% endblock %}
+{% block content %}
+<section class="panel center-panel">
+    <p class="eyebrow">Person ready</p>
+    <h1>Welcome back, {{ person.name }}</h1>
+    <p class="muted">ID: {{ person.student_id }}</p>
+    <a class="button primary wide" href="{% url 'scanner:dashboard' person.student_id %}">Open Dashboard</a>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+localStorage.setItem("person_id", "{{ person.student_id|escapejs }}");
+window.location.href = "{% url 'scanner:dashboard' person.student_id %}";
+</script>
+{% endblock %}

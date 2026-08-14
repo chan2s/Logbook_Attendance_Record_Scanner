@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Upload Logbook Image{% endblock %}
+{% block content %}
+<section class="panel scanner-panel upload-scanner" data-person-id="{{ person.student_id }}" data-upload-url="{% url 'scanner:upload_scan_api' %}" data-select-row-url="{% url 'scanner:select_scan_row_api' %}">
+    <div>
+        <p class="eyebrow">Scan for {{ person.name }}</p>
+        <h1>Upload Image</h1>
+        <p class="muted">Upload a clear JPG, JPEG, PNG, or WEBP image of your logbook page.</p>
+    </div>
+
+    <form id="uploadForm" class="stacked-form">
+        {% csrf_token %}
+        <input id="imageInput" class="visually-hidden" type="file" name="image" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
+
+        <div id="dropZone" class="upload-drop" tabindex="0" role="button" aria-label="Upload logbook image">
+            <div class="upload-icon">+</div>
+            <h2>Upload Logbook Image</h2>
+            <p>Drag & drop an image here</p>
+            <p class="muted">or</p>
+            <button class="button ghost" type="button" id="chooseImageButton">Choose Image</button>
+            <small>JPG / JPEG / PNG / WEBP</small>
+        </div>
+
+        <div id="previewPanel" class="preview-panel hidden">
+            <div class="preview-frame">
+                <img id="imagePreview" alt="Logbook preview">
+            </div>
+            <p class="filename">filename: <span id="fileName"></span></p>
+            <div class="split-actions">
+                <button class="button ghost" type="button" id="changeImageButton">Change Image</button>
+                <button class="button primary" type="submit" id="scanImageButton">Scan Image</button>
+            </div>
+        </div>
+    </form>
+
+    <div id="scanState" class="scan-state hidden" aria-live="polite">
+        <div class="pulse"></div>
+        <p id="scanStateText">Uploading image...</p>
+    </div>
+
+    <div id="scanError" class="scan-error hidden">
+        <h2 id="scanErrorTitle">Scan needs review</h2>
+        <p id="scanErrorDetail"></p>
+        <pre id="ocrDebug" class="ocr-debug hidden"></pre>
+        <div id="possibleMatches" class="possible-matches hidden">
+            <h3>Possible matches</h3>
+            <div id="possibleMatchesList"></div>
+        </div>
+        <button class="button primary wide" type="button" id="tryAnotherButton">Try Another Image</button>
+        <a class="button ghost wide" href="{% url 'scanner:review' person.student_id %}">Enter Attendance Manually</a>
+    </div>
+
+    <form id="resultForm" class="scan-result hidden" method="post" action="{% url 'scanner:review' person.student_id %}">
+        {% csrf_token %}
+        <div>
+            <p class="eyebrow">Scan Result</p>
+            <h2>Detected Attendance</h2>
+            <p id="resultWarnings" class="muted"></p>
+        </div>
+        <div class="result-grid">
+            <span>Person</span>
+            <strong id="resultPerson">{{ person.name }}</strong>
+            <span>Date</span>
+            <strong id="resultDate"></strong>
+            <span>Morning</span>
+            <strong id="resultMorning"></strong>
+            <span>Afternoon</span>
+            <strong id="resultAfternoon"></strong>
+            <span>Total</span>
+            <strong id="resultTotal"></strong>
+            <span>OCR Confidence</span>
+            <strong id="resultConfidence"></strong>
+        </div>
+
+        <div class="editable-result-grid">
+            <label><span>Name</span><input type="text" name="name" id="fieldName"></label>
+            <label><span>Date</span><input type="date" name="date" id="fieldDate"></label>
+            <label><span>AM-in</span><input type="time" name="time_in_1" id="fieldTimeIn1"></label>
+            <label><span>AM-out</span><input type="time" name="time_out_1" id="fieldTimeOut1"></label>
+            <label><span>PM-in</span><input type="time" name="time_in_2" id="fieldTimeIn2"></label>
+            <label><span>PM-out</span><input type="time" name="time_out_2" id="fieldTimeOut2"></label>
+        </div>
+
+        <div class="split-actions">
+            <a class="button ghost" href="{% url 'scanner:scan' person.student_id %}">Scan Again</a>
+            <button class="button primary" type="submit">Confirm</button>
+        </div>
+    </form>
+
+    <a class="button ghost wide" href="{% url 'scanner:dashboard' person.student_id %}">Back to Dashboard</a>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+setupUploadScanner();
+</script>
+{% endblock %}

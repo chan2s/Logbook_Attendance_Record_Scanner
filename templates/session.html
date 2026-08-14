@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Current Scan Session{% endblock %}
+{% block content %}
+<section class="panel session-panel">
+    <div>
+        <p class="eyebrow">Current Scan Session</p>
+        <h1>What would you like to do?</h1>
+    </div>
+    {% if records %}
+        <div class="session-list">
+            {% for record in records %}
+                <div class="session-row">
+                    <div>
+                        <strong>{{ record.date }}</strong>
+                        {% if record.morning %}<span>{{ record.morning }}</span>{% endif %}
+                        {% if record.afternoon %}<span>{{ record.afternoon }}</span>{% endif %}
+                    </div>
+                    <strong>{{ record.total_display }}</strong>
+                </div>
+            {% endfor %}
+        </div>
+        <div class="total-card">
+            <span>Session Total</span>
+            <strong>{{ session_total }}</strong>
+        </div>
+    {% else %}
+        <p class="empty-state">No confirmed scans are in this session yet.</p>
+    {% endif %}
+    <div class="split-actions">
+        <a class="button primary" href="{% url 'scanner:scan' person.student_id %}">Upload Another Image</a>
+        <form method="post" action="{% url 'scanner:summary' person.student_id %}">
+            {% csrf_token %}
+            <button class="button secondary" type="submit" {% if not records %}disabled{% endif %}>Total Time</button>
+        </form>
+    </div>
+</section>
+{% endblock %}

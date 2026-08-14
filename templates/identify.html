@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Identify Person{% endblock %}
+{% block content %}
+<section class="panel identify-panel">
+    <div>
+        <p class="eyebrow">OCR Logbook Time Scanner</p>
+        <h1>Who is scanning today?</h1>
+        <p class="muted">Use your Student or Employee ID. This browser will remember only that ID.</p>
+    </div>
+    <form method="post" class="stacked-form">
+        {% csrf_token %}
+        <label>
+            <span>Student/Employee ID</span>
+            {{ form.student_id }}
+        </label>
+        <label>
+            <span>Full Name</span>
+            {{ form.name }}
+        </label>
+        <button class="button primary wide" type="submit">Continue</button>
+    </form>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+restoreRememberedPerson();
+</script>
+{% endblock %}

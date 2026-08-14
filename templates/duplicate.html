@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Duplicate Attendance{% endblock %}
+{% block content %}
+<section class="panel center-panel">
+    <p class="eyebrow">Duplicate attendance</p>
+    <h1>This attendance record has already been recorded.</h1>
+    <p class="muted">{{ record.date }} · {{ record.total_display }}</p>
+    <div class="split-actions">
+        <a class="button ghost" href="{% url 'scanner:scan_session' person.student_id %}">Keep Existing</a>
+        <a class="button primary" href="{% url 'scanner:review' person.student_id %}">Review</a>
+    </div>
+</section>
+{% endblock %}

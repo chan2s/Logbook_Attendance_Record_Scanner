@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Switch Person{% endblock %}
+{% block content %}
+<section class="panel center-panel">
+    <p class="eyebrow">Switched</p>
+    <h1>Ready for another person</h1>
+    <p class="muted">The remembered browser ID was cleared. Attendance records remain in the database.</p>
+    <a class="button primary wide" href="{% url 'scanner:identify' %}">Continue</a>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+localStorage.removeItem("person_id");
+setTimeout(() => { window.location.href = "{% url 'scanner:identify' %}"; }, 500);
+</script>
+{% endblock %}

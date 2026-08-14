@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}OJT Hours Summary{% endblock %}
+{% block content %}
+<section class="panel summary-panel">
+    <p class="eyebrow">OJT Hours Summary</p>
+    <h1>{{ person.name }}</h1>
+    <div class="summary-grid">
+        <span>Previous Total</span>
+        <strong>{{ previous_total }}</strong>
+        <span>Current Scan</span>
+        <strong>{{ current_total }}</strong>
+        <span>Total Completed</span>
+        <strong>{{ completed }}</strong>
+        <span>Required</span>
+        <strong>{{ target }}</strong>
+        <span>Remaining</span>
+        <strong>{{ remaining }}</strong>
+    </div>
+    {% if skipped_duplicates %}
+        <div class="message warning">{{ skipped_duplicates }} duplicate record{{ skipped_duplicates|pluralize }} kept existing.</div>
+    {% endif %}
+    {% if saved %}
+        <p class="muted">Confirmed attendance records were saved to the database.</p>
+    {% endif %}
+    <a class="button primary wide" href="{% url 'scanner:dashboard' person.student_id %}">Done</a>
+</section>
+{% endblock %}
