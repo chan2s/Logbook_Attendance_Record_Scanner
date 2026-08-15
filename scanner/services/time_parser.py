@@ -28,6 +28,18 @@ DATE_PATTERNS = [
 ]
 TIME_RE = re.compile(r"\b(?P<hour>\d{1,2})(?::(?P<minute>\d{2}))?\s*(?P<ampm>[AaPp]\.?[Mm]\.?)?\b")
 
+# Time patterns used by parse_logbook_time, in priority order.
+# 1. "8:00", "8.00"          (separator with exactly two minute digits)
+# 2. "8 00"                  (space separator)
+# 3. "8", "12"               (bare hour)
+# 4. "800" -> 8:00, "1230" -> 12:30 (digits only)
+TIME_VALUE_PATTERNS = [
+    re.compile(r"(?P<hour>\d{1,2})[:.](?P<minute>\d{2})(?![0-9])"),
+    re.compile(r"(?P<hour>\d{1,2})\s+(?P<minute>\d{2})(?![0-9])"),
+    re.compile(r"(?<![0-9])(?P<hour>\d{1,2})(?![0-9])"),
+    re.compile(r"(?P<digits>\d{3,4})"),
+]
+
 
 @dataclass
 class ParsedAttendance:
@@ -75,25 +87,49 @@ def parse_time(text):
 
 
 def parse_logbook_time(text, period=None):
-    cleaned = re.sub(r"[^0-9:apmAPM]+", " ", text).strip()
-    match = TIME_RE.search(cleaned)
-    if not match:
+    """Parse an OCR'd logbook time value.
+
+    The logbook columns already determine AM/PM (spec: "AM-in must be
+    interpreted as a morning time"), so any AM/PM token in the OCR text is
+    ignored when a period is provided. Handles common handwritten forms:
+    "8:00", "8.00", "8 00", "800", "8", "12", "12:30", "1230".
+    """
+    if not text or not text.strip():
+        return None
+    cleaned = text.strip().replace(",", " ")
+
+    hour = minute = None
+    for pattern in TIME_VALUE_PATTERNS:
+        match = pattern.search(cleaned)
+        if not match:
+            continue
+        if pattern.groupindex.get("digits") and match.group("digits"):
+            digits = match.group("digits")
+            if len(digits) == 4:
+                hour, minute = int(digits[:2]), int(digits[2:])
+            else:
+                hour, minute = int(digits[0]), int(digits[1:3])
+        else:
+            hour = int(match.group("hour"))
+            minute_text = match.groupdict().get("minute")
+            minute = int(minute_text) if minute_text else 0
+        break
+
+    if hour is None or hour > 23 or minute > 59:
         return None
 
-    hour = int(match.group("hour"))
-    minute = int(match.group("minute") or 0)
-    ampm = (match.group("ampm") or "").lower().replace(".", "")
-    if hour > 23 or minute > 59:
-        return None
+    # Handwritten "00" is frequently misread as "01"-"04" by TrOCR; logbook
+    # entries are recorded on the hour or quarter hour, so snap tiny drift.
+    if 1 <= minute <= 4:
+        minute = 0
 
-    if ampm == "pm" and hour < 12:
+    # The column determines AM/PM; never trust OCR's AM/PM text here.
+    if period == "pm" and 1 <= hour <= 7:
         hour += 12
-    elif ampm == "am" and hour == 12:
-        hour = 0
-    elif not ampm and period == "pm" and 1 <= hour <= 7:
-        hour += 12
-    elif not ampm and period == "am" and hour == 12:
-        hour = 12
+    elif period == "pm" and hour == 12:
+        hour = 12  # noon
+    elif period == "am" and hour == 12:
+        hour = 12  # noon (AM-out boundary)
 
     try:
         return time(hour, minute)

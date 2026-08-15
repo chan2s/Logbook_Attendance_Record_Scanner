@@ -5,8 +5,8 @@
     <div>
         <p class="eyebrow">Scan Result</p>
         <h1>{% if pending.warnings %}Verify Carefully{% else %}Scan Successful{% endif %}</h1>
-        {% if pending.confidence %}
-            <p class="muted">OCR confidence: {{ pending.confidence }}</p>
+        {% if pending.needs_review %}
+            <p class="muted">Fields needing review: {{ pending.needs_review|join:", " }}.</p>
         {% endif %}
     </div>
 
@@ -30,13 +30,13 @@
 
     <form method="post" class="review-form">
         {% csrf_token %}
-        <label><span>Name</span>{{ form.name }}</label>
-        <label><span>Date</span>{{ form.date }}</label>
+        <label><span>Name{% if "name" in pending.needs_review %} <em class="review-badge">Needs review</em>{% endif %}</span>{{ form.name }}</label>
+        <label><span>Date{% if "date" in pending.needs_review %} <em class="review-badge">Needs review</em>{% endif %}</span>{{ form.date }}</label>
         <div class="time-grid">
-            <label><span>Time In</span>{{ form.time_in_1 }}</label>
-            <label><span>Time Out</span>{{ form.time_out_1 }}</label>
-            <label><span>Time In</span>{{ form.time_in_2 }}</label>
-            <label><span>Time Out</span>{{ form.time_out_2 }}</label>
+            <label><span>Time In{% if "am_in" in pending.needs_review %} <em class="review-badge">Needs review</em>{% endif %}</span>{{ form.time_in_1 }}</label>
+            <label><span>Time Out{% if "am_out" in pending.needs_review %} <em class="review-badge">Needs review</em>{% endif %}</span>{{ form.time_out_1 }}</label>
+            <label><span>Time In{% if "pm_in" in pending.needs_review %} <em class="review-badge">Needs review</em>{% endif %}</span>{{ form.time_in_2 }}</label>
+            <label><span>Time Out{% if "pm_out" in pending.needs_review %} <em class="review-badge">Needs review</em>{% endif %}</span>{{ form.time_out_2 }}</label>
         </div>
         {% if form.non_field_errors %}
             <div class="message error">{{ form.non_field_errors }}</div>

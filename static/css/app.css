@@ -467,6 +467,53 @@ tr:last-child td {
     gap: 14px;
 }
 
+.field-confidence {
+    margin-top: 4px;
+}
+
+.confidence-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1px;
+    overflow: hidden;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+}
+
+.confidence-grid span,
+.confidence-grid strong {
+    padding: 9px 12px;
+    background: #f8faf9;
+}
+
+.confidence-grid span {
+    color: var(--muted);
+    font-size: 0.85rem;
+    font-weight: 800;
+}
+
+.confidence-grid strong {
+    text-align: right;
+}
+
+.confidence-grid strong.needs-review {
+    color: var(--warning);
+}
+
+.review-badge {
+    display: inline-block;
+    width: max-content;
+    padding: 4px 10px;
+    border-radius: 999px;
+    color: var(--warning);
+    background: var(--warning-bg);
+    border: 1px solid #f0d18b;
+    font-size: 0.75rem;
+    font-style: normal;
+    font-weight: 800;
+}
+
 .result-grid span,
 .result-grid strong {
     padding: 14px 16px;

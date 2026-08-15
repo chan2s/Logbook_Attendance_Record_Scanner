@@ -8,8 +8,9 @@
         <p class="muted">Upload a clear JPG, JPEG, PNG, or WEBP image of your logbook page.</p>
     </div>
 
-    <form id="uploadForm" class="stacked-form">
+    <form id="uploadForm" class="stacked-form" method="post" action="{% url 'scanner:upload_scan_api' %}" enctype="multipart/form-data">
         {% csrf_token %}
+        <input type="hidden" name="person_id" value="{{ person.student_id }}">
         <input id="imageInput" class="visually-hidden" type="file" name="image" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
 
         <div id="dropZone" class="upload-drop" tabindex="0" role="button" aria-label="Upload logbook image">
@@ -72,13 +73,18 @@
             <strong id="resultConfidence"></strong>
         </div>
 
+        <div class="field-confidence">
+            <p class="eyebrow">Field confidence</p>
+            <div class="confidence-grid" id="confidenceGrid"></div>
+        </div>
+
         <div class="editable-result-grid">
-            <label><span>Name</span><input type="text" name="name" id="fieldName"></label>
-            <label><span>Date</span><input type="date" name="date" id="fieldDate"></label>
-            <label><span>AM-in</span><input type="time" name="time_in_1" id="fieldTimeIn1"></label>
-            <label><span>AM-out</span><input type="time" name="time_out_1" id="fieldTimeOut1"></label>
-            <label><span>PM-in</span><input type="time" name="time_in_2" id="fieldTimeIn2"></label>
-            <label><span>PM-out</span><input type="time" name="time_out_2" id="fieldTimeOut2"></label>
+            <label><span>Name</span><input type="text" name="name" id="fieldName"><em class="review-badge hidden" data-review="name">Needs review</em></label>
+            <label><span>Date</span><input type="date" name="date" id="fieldDate"><em class="review-badge hidden" data-review="date">Needs review</em></label>
+            <label><span>AM-in</span><input type="time" name="time_in_1" id="fieldTimeIn1"><em class="review-badge hidden" data-review="am_in">Needs review</em></label>
+            <label><span>AM-out</span><input type="time" name="time_out_1" id="fieldTimeOut1"><em class="review-badge hidden" data-review="am_out">Needs review</em></label>
+            <label><span>PM-in</span><input type="time" name="time_in_2" id="fieldTimeIn2"><em class="review-badge hidden" data-review="pm_in">Needs review</em></label>
+            <label><span>PM-out</span><input type="time" name="time_out_2" id="fieldTimeOut2"><em class="review-badge hidden" data-review="pm_out">Needs review</em></label>
         </div>
 
         <div class="split-actions">

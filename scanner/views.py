@@ -1,5 +1,7 @@
 from datetime import datetime
+import json
 import logging
+import time
 
 from django.contrib import messages
 from django.core.files.storage import default_storage
@@ -146,57 +148,80 @@ def scan(request, student_id):
 
 
 def upload_scan_api(request):
+    request_start = time.perf_counter()
+    request_id = request.POST.get("request_id", "").strip() or "unknown"
+    print(f"[UPLOAD] START request_id={request_id}")
+
+    def complete(message=""):
+        print(f"[UPLOAD] COMPLETE request_id={request_id} {message}".rstrip())
+
     if request.method != "POST":
-        return api_error("request_method", "Only POST uploads are supported.", status=405)
+        complete("method_not_allowed")
+        return api_error("request_method", "Only POST uploads are supported.", status=405, request_id=request_id)
 
     student_id = request.POST.get("person_id", "").strip()
     if not student_id:
-        return api_error("invalid_upload", "Missing selected person.", status=400)
+        complete("invalid_upload")
+        return api_error("invalid_upload", "Missing selected person.", status=400, request_id=request_id)
     person = Person.objects.filter(student_id=student_id).first()
     if person is None:
-        return api_error("person_lookup", "Selected person was not found.", status=404)
+        complete("person_lookup")
+        return api_error("person_lookup", "Selected person was not found.", status=404, request_id=request_id)
     if "image" not in request.FILES:
-        return api_error("image_validation", "Missing image. Please choose a logbook image.", status=400)
+        complete("image_validation")
+        return api_error("image_validation", "Missing image. Please choose a logbook image.", status=400, request_id=request_id)
 
     form = ScanUploadForm(request.POST, request.FILES)
     if not form.is_valid():
         error = form.errors.get("image", ["Invalid file type. Please upload a JPG, JPEG, PNG, or WEBP image."])[0]
-        return api_error("image_validation", str(error), status=400)
+        complete("image_validation")
+        return api_error("image_validation", str(error), status=400, request_id=request_id)
+    print("[UPLOAD] Request validated")
 
     image = form.cleaned_data["image"]
     image_path = default_storage.save(f"logbook_scans/originals/{student_id}/{image.name}", image)
     crop_box = parse_crop_box(request)
 
+    logger.info("Starting OCR processing for uploaded scan: %s", image_path)
     try:
         scan_result = scan_handwritten_logbook(default_storage.path(image_path), person, crop_box=crop_box)
     except TableDetectionError as exc:
         logger.exception("Table detection failed for uploaded scan.")
         request.session[pending_key(student_id)] = pending_failure(person, image_path, str(exc), crop_box=crop_box)
         request.session.modified = True
+        print(f"[OCR] Total request: {time.perf_counter() - request_start:.2f}s")
+        complete("table_detection")
         return api_error(
             "table_detection",
             "No attendance table or rows were detected clearly enough.",
             detail=str(exc),
             status=422,
             actions=["try_again", "select_row_manually", "enter_attendance_manually"],
+            request_id=request_id,
         )
     except (HandwritingOCRUnavailable, OCRUnavailable) as exc:
         logger.exception("OCR processing is unavailable.")
         request.session[pending_key(student_id)] = pending_failure(person, image_path, str(exc), crop_box=crop_box)
         request.session.modified = True
+        print(f"[OCR] Total request: {time.perf_counter() - request_start:.2f}s")
+        complete("ocr_processing")
         return api_error(
             "ocr_processing",
             "The handwriting OCR service is not available.",
             detail=str(exc),
             status=503,
             actions=["try_again", "enter_attendance_manually"],
+            request_id=request_id,
         )
     except Exception:
         logger.exception("Unexpected scanner upload failure.")
+        print(f"[OCR] Total request: {time.perf_counter() - request_start:.2f}s")
+        complete("server_error")
         return api_error(
             "server_error",
             "A server error occurred while processing the image.",
             status=500,
+            request_id=request_id,
         )
 
     possible_rows = [serialize_recognized_row(row, person.name) for row in scan_result.rows]
@@ -209,7 +234,10 @@ def upload_scan_api(request):
         "time_in_2": "",
         "time_out_2": "",
         "total_minutes": 0,
+        "total_display": format_minutes(0),
         "confidence": scan_result.confidence,
+        "field_confidences": scan_result.debug.get("field_confidences", {}),
+        "needs_review": scan_result.debug.get("needs_review", []),
         "warnings": scan_result.warnings,
         "source_line": "",
         "source_image": image_path,
@@ -222,6 +250,8 @@ def upload_scan_api(request):
     request.session.modified = True
 
     if selected is None:
+        print(f"[OCR] Total request: {time.perf_counter() - request_start:.2f}s")
+        complete("name_matching")
         return api_error(
             "name_matching",
             "Could not confidently identify the selected person.",
@@ -232,9 +262,12 @@ def upload_scan_api(request):
             confidence=scan_result.confidence,
             ocr_debug=scan_result.debug,
             actions=["try_again", "select_row_manually", "enter_attendance_manually"],
+            request_id=request_id,
         )
 
-    if not selected.date or selected.total_minutes == 0:
+    if selected.total_minutes == 0:
+        print(f"[OCR] Total request: {time.perf_counter() - request_start:.2f}s")
+        complete("time_extraction")
         return api_error(
             "time_extraction",
             "The row was found, but one or more date/time values need review.",
@@ -245,11 +278,15 @@ def upload_scan_api(request):
             confidence=scan_result.confidence,
             ocr_debug=scan_result.debug,
             actions=["edit_result", "select_row_manually", "enter_attendance_manually"],
+            request_id=request_id,
         )
 
-    return JsonResponse(
+    print(f"[OCR] Total request: {time.perf_counter() - request_start:.2f}s")
+    complete("success")
+    return json_response_with_log(
         {
             "success": True,
+            "request_id": request_id,
             "person": person.name,
             "date": pending["date"],
             "time_in_1": pending["time_in_1"],
@@ -260,6 +297,8 @@ def upload_scan_api(request):
             "total_minutes": selected.total_minutes,
             "total_display": format_minutes(selected.total_minutes),
             "confidence": scan_result.confidence,
+            "field_confidences": selected.field_confidences,
+            "needs_review": selected.needs_review,
             "warnings": scan_result.warnings,
             "source_line": selected.name_text,
             "possible_rows": possible_rows,
@@ -270,22 +309,32 @@ def upload_scan_api(request):
 
 
 def select_scan_row_api(request):
+    request_id = request.POST.get("request_id", "").strip() or "unknown"
+    print(f"[UPLOAD] START request_id={request_id} (select-row)")
+
+    def complete(message=""):
+        print(f"[UPLOAD] COMPLETE request_id={request_id} {message}".rstrip())
+
     if request.method != "POST":
-        return api_error("request_method", "Only POST row selection is supported.", status=405)
+        complete("method_not_allowed")
+        return api_error("request_method", "Only POST row selection is supported.", status=405, request_id=request_id)
 
     student_id = request.POST.get("person_id", "").strip()
     person = Person.objects.filter(student_id=student_id).first()
     if person is None:
-        return api_error("person_lookup", "Selected person was not found.", status=404)
+        complete("person_lookup")
+        return api_error("person_lookup", "Selected person was not found.", status=404, request_id=request_id)
     try:
         row_index = int(request.POST.get("row_index", ""))
     except ValueError:
-        return api_error("attendance_row_detection", "Invalid row selection.", status=400)
+        complete("attendance_row_detection")
+        return api_error("attendance_row_detection", "Invalid row selection.", status=400, request_id=request_id)
 
     pending = request.session.get(pending_key(student_id), {})
     image_path = pending.get("source_image")
     if not image_path:
-        return api_error("invalid_upload", "No uploaded image is available for row selection.", status=400)
+        complete("invalid_upload")
+        return api_error("invalid_upload", "No uploaded image is available for row selection.", status=400, request_id=request_id)
 
     try:
         scan_result = scan_row_by_index(
@@ -296,13 +345,16 @@ def select_scan_row_api(request):
         )
     except TableDetectionError as exc:
         logger.exception("Manual row selection failed.")
-        return api_error("attendance_row_detection", str(exc), status=422)
+        complete("attendance_row_detection")
+        return api_error("attendance_row_detection", str(exc), status=422, request_id=request_id)
     except (HandwritingOCRUnavailable, OCRUnavailable) as exc:
         logger.exception("OCR processing is unavailable during manual row selection.")
-        return api_error("ocr_processing", "The handwriting OCR service is not available.", detail=str(exc), status=503)
+        complete("ocr_processing")
+        return api_error("ocr_processing", "The handwriting OCR service is not available.", detail=str(exc), status=503, request_id=request_id)
     except Exception:
         logger.exception("Unexpected manual row selection failure.")
-        return api_error("server_error", "A server error occurred while processing the selected row.", status=500)
+        complete("server_error")
+        return api_error("server_error", "A server error occurred while processing the selected row.", status=500, request_id=request_id)
 
     row = scan_result.selected
     possible_rows = [serialize_recognized_row(item, person.name) for item in scan_result.rows]
@@ -312,7 +364,8 @@ def select_scan_row_api(request):
     request.session[pending_key(student_id)] = pending
     request.session.modified = True
 
-    if not row.date or row.total_minutes == 0:
+    if row.total_minutes == 0:
+        complete("time_extraction")
         return api_error(
             "time_extraction",
             "The selected row was read, but one or more date/time values need review.",
@@ -322,11 +375,14 @@ def select_scan_row_api(request):
             confidence=scan_result.confidence,
             ocr_debug=scan_result.debug,
             actions=["edit_result", "enter_attendance_manually"],
+            request_id=request_id,
         )
 
-    return JsonResponse(
+    complete("success")
+    return json_response_with_log(
         {
             "success": True,
+            "request_id": request_id,
             "person": person.name,
             "date": pending["date"],
             "time_in_1": pending["time_in_1"],
@@ -337,6 +393,8 @@ def select_scan_row_api(request):
             "total_minutes": row.total_minutes,
             "total_display": format_minutes(row.total_minutes),
             "confidence": scan_result.confidence,
+            "field_confidences": row.field_confidences,
+            "needs_review": row.needs_review,
             "warnings": scan_result.warnings,
             "source_line": row.name_text,
             "possible_rows": possible_rows,
@@ -351,6 +409,13 @@ def api_error(stage, error, status, **extra):
     return JsonResponse(payload, status=status)
 
 
+def json_response_with_log(response_data):
+    """Build a JsonResponse and print the exact payload sent to the browser."""
+    print("[UPLOAD] FINAL RESPONSE:")
+    print(json.dumps(response_data, indent=2, default=str))
+    return JsonResponse(response_data)
+
+
 def pending_failure(person, image_path, warning, crop_box=None):
     return {
         "name": person.name,
@@ -360,6 +425,7 @@ def pending_failure(person, image_path, warning, crop_box=None):
         "time_in_2": "",
         "time_out_2": "",
         "total_minutes": 0,
+        "total_display": format_minutes(0),
         "confidence": 0,
         "warnings": [warning],
         "source_line": "",
@@ -403,6 +469,8 @@ def serialize_recognized_row(row, target_name):
         "total_minutes": row.total_minutes,
         "total_display": format_minutes(row.total_minutes),
         "confidence": round(row.ocr_confidence * 100),
+        "field_confidences": {key: round(value * 100) for key, value in row.field_confidences.items()},
+        "needs_review": row.needs_review,
         "warnings": row.warnings,
     }
 
@@ -416,7 +484,10 @@ def pending_from_row(row, person, image_path, scan_result, possible_rows):
         "time_in_2": serialize_time(row.time_in_2),
         "time_out_2": serialize_time(row.time_out_2),
         "total_minutes": row.total_minutes,
+        "total_display": format_minutes(row.total_minutes),
         "confidence": scan_result.confidence,
+        "field_confidences": {key: round(value * 100) for key, value in row.field_confidences.items()},
+        "needs_review": row.needs_review,
         "warnings": scan_result.warnings,
         "source_line": row.name_text,
         "source_image": image_path,
